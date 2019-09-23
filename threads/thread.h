@@ -142,5 +142,8 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void push_thread_to_blockQ(int64_t);
+bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
+struct list ready_list;
+void dump_ready_queue(void);
 #endif /* threads/thread.h */

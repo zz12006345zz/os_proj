@@ -23,14 +23,14 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+// static struct list ready_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
 static struct list block_queue; /* actually sleep queue */
-static struct lock block_lock;
+// static struct lock block_lock;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -76,32 +76,30 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 static bool insert_by_target(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
-  struct thread *thread_a = list_entry(a, struct thread, sleep_elem);
-  struct thread *thread_b = list_entry(b, struct thread, sleep_elem);
+  // struct thread *thread_a = list_entry(a, struct thread, sleep_elem);
+  // struct thread *thread_b = list_entry(b, struct thread, sleep_elem);
 
-  if(thread_a->time_to_wake < thread_b->time_to_wake){
-    return true;
-  }else if(thread_a->time_to_wake == thread_b->time_to_wake){
-    if(thread_a->priority > thread_b->priority){
-      return true;
-    }else{
-      return false;
-    }
-  }
-  return false;
+  // if(thread_a->time_to_wake < thread_b->time_to_wake){
+  //   return true;
+  // }else if(thread_a->time_to_wake == thread_b->time_to_wake){
+  //   if(thread_a->priority > thread_b->priority){
+  //     return true;
+  //   }else{
+  //     return false;
+  //   }
+  // }
+  // return false;
+  return list_entry(a, struct thread, sleep_elem)->time_to_wake <= list_entry(b, struct thread, sleep_elem)->time_to_wake;
 };
 
 /*
 insert by priority
 */
-static bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
-  struct thread *thread_a = list_entry(a, struct thread, sleep_elem);
-  struct thread *thread_b = list_entry(b, struct thread, sleep_elem);
+bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+  // struct thread *thread_a = list_entry(a, struct thread, elem);
+  // struct thread *thread_b = list_entry(b, struct thread, elem);
 
-  if(thread_a->priority > thread_b->priority){
-    return true;
-  }
-  return false;
+  return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 };
 
 static void try_preempt_sync(void){
@@ -110,7 +108,6 @@ static void try_preempt_sync(void){
   if(list_empty(&ready_list))
     return;
   
-  // struct thread *first_waiting_thread = list_entry(list_front(&ready_list), struct thread, elem);
   if(running_thread()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
     thread_yield();
   }
@@ -122,7 +119,6 @@ static void try_preempt_async(void){
   if(list_empty(&ready_list))
     return;
   
-  // struct thread *first_waiting_thread = list_entry(list_front(&ready_list), struct thread, elem); 
   if(running_thread()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
     intr_yield_on_return();
   }
@@ -146,7 +142,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  lock_init (&block_lock);
+  // lock_init (&block_lock);
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&block_queue);
@@ -197,31 +193,24 @@ thread_tick (int64_t ticks)
     //TODO set a threshold for the loop
     struct list_elem *thread_elem;
     struct thread *th;
-    // while(!list_empty(&block_queue)){
+    while(!list_empty(&block_queue)){
       thread_elem = list_begin(&block_queue);
       th = list_entry(thread_elem, struct thread, sleep_elem);
       if(th->time_to_wake <= ticks){
         temp = true;
         list_remove(thread_elem);
-        // sema_up(&th->wake_sig);
-        thread_unblock(th);
+        sema_up(&th->wake_sig);
+        // thread_unblock(th);
         // printf("wake up! tid:%d\n", th->priority);
+      }else{
+        break;
       }
-      // else{
-      //   break;
-      // }
-    // }
-    // if(temp){
-    //   try_preempt_async();
-    // }
-    try_preempt_async();
+    }
+    if(temp){
+      try_preempt_async();
+    }
   }
   
-  // if(temp == true){
-  //   for(struct list_elem *a = list_begin(&ready_list); a != list_end(&ready_list); a = list_next(a)){
-  //     printf("pri :%d\n", list_entry(a,struct thread, elem)->priority);
-  //   }
-  // }
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
@@ -296,17 +285,17 @@ void push_thread_to_blockQ(int64_t wakeup_time)
 {
   struct thread * th = thread_current();
   th->time_to_wake = wakeup_time;
-  lock_acquire(&block_lock);
+  // lock_acquire(&block_lock);
   
   // printf("insert: prio%d\n",th->priority);
   list_insert_ordered(&block_queue, &th->sleep_elem, insert_by_target, NULL);
 
-  lock_release(&block_lock);
-  // sema_down(&th->wake_sig);
-  enum intr_level old_level = intr_disable ();
-  thread_block ();
+  // lock_release(&block_lock);
+  sema_down(&th->wake_sig);
+  // enum intr_level old_level = intr_disable ();
+  // thread_block ();
 
-  intr_set_level (old_level);
+  // intr_set_level (old_level);
 }
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
@@ -341,7 +330,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  // list_push_back (&ready_list, &t->elem);
+
   list_insert_ordered(&ready_list, &t->elem, priority_comp, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -413,7 +402,6 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) {
-    // list_push_back (&ready_list, &cur->elem);
     list_insert_ordered(&ready_list, &cur->elem, priority_comp, NULL);
   }
   
@@ -444,11 +432,10 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  if(new_priority > thread_current ()->priority ){
-    thread_current ()->priority = new_priority;
-    try_preempt_sync();
-  }else{
-    thread_current ()->priority = new_priority;
+  struct thread* th = thread_current();
+  th->priority = new_priority;
+  if(th->status == THREAD_RUNNING && !list_empty(&ready_list) && list_entry(list_front(&ready_list), struct thread, elem)->priority > new_priority){
+    thread_yield();
   }
 }
 
@@ -693,7 +680,15 @@ allocate_tid (void)
 
   return tid;
 }
-
+
+void dump_ready_queue(){
+  struct list_elem* a;
+  printf("ready q: ");
+  for(a = list_begin(&ready_list); a != list_end(&ready_list); a = list_next(a)){
+    printf("%d ",list_entry(a,struct thread, elem)->priority);
+  }
+  printf("\n");
+}
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
