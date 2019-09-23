@@ -41,7 +41,7 @@ timer_init (void)
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
 void
-timer_calibrate (void) 
+timer_calibrate (void)
 {
   unsigned high_bit, test_bit;
 
@@ -92,8 +92,14 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  // while (timer_elapsed (start) < ticks) {
+    // thread_yield ();
+  // }
+  // printf("sleep!\n");
+  if(ticks < 0){
+    return;
+  }
+  push_thread_to_blockQ(start+ticks);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,7 +177,7 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
+  thread_tick (ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

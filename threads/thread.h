@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -86,12 +87,15 @@ struct thread
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
+    int64_t time_to_wake;               /* At which time the thread should be waken ,meanless if thread is outside the block queue*/
+    struct semaphore wake_sig; /* sema down by itself, and up in timer interrupt */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    struct list_elem sleep_elem;      /* List sleepers */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -101,7 +105,6 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
-
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -110,7 +113,7 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
-void thread_tick (void);
+void thread_tick (int64_t ticks);
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
@@ -137,5 +140,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void push_thread_to_blockQ(int64_t);
 
 #endif /* threads/thread.h */
