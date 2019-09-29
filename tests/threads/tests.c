@@ -11,13 +11,13 @@ struct test
 
 static const struct test tests[] = 
   {
-    {"alarm-single", test_alarm_single},
-    {"alarm-multiple", test_alarm_multiple},
+    {"alarm-single", test_alarm_single},// pass
+    {"alarm-multiple", test_alarm_multiple},// pass
     {"alarm-simultaneous", test_alarm_simultaneous},
-    {"alarm-priority", test_alarm_priority},
-    {"alarm-zero", test_alarm_zero},
-    {"alarm-negative", test_alarm_negative},
-    {"priority-change", test_priority_change},
+    {"alarm-priority", test_alarm_priority}, // pass
+    {"alarm-zero", test_alarm_zero},// pass
+    {"alarm-negative", test_alarm_negative}, // pass
+    {"priority-change", test_priority_change}, // pass
     {"priority-donate-one", test_priority_donate_one},
     {"priority-donate-multiple", test_priority_donate_multiple},
     {"priority-donate-multiple2", test_priority_donate_multiple2},
@@ -25,13 +25,13 @@ static const struct test tests[] =
     {"priority-donate-sema", test_priority_donate_sema},
     {"priority-donate-lower", test_priority_donate_lower},
     {"priority-donate-chain", test_priority_donate_chain},
-    {"priority-fifo", test_priority_fifo},
-    {"priority-preempt", test_priority_preempt},
-    {"priority-sema", test_priority_sema},
-    {"priority-condvar", test_priority_condvar},
-    {"mlfqs-load-1", test_mlfqs_load_1},
-    {"mlfqs-load-60", test_mlfqs_load_60},
-    {"mlfqs-load-avg", test_mlfqs_load_avg},
+    {"priority-fifo", test_priority_fifo},// pass
+    {"priority-preempt", test_priority_preempt}, // pass
+    {"priority-sema", test_priority_sema}, // pass
+    {"priority-condvar", test_priority_condvar}, // pass
+    {"mlfqs-load-1", test_mlfqs_load_1}, // pass
+    {"mlfqs-load-60", test_mlfqs_load_60}, // pass
+    {"mlfqs-load-avg", test_mlfqs_load_avg}, // make .result shows pass, not goes into details
     {"mlfqs-recent-1", test_mlfqs_recent_1},
     {"mlfqs-fair-2", test_mlfqs_fair_2},
     {"mlfqs-fair-20", test_mlfqs_fair_20},
