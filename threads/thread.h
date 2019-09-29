@@ -5,7 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
-
+#include "threads/myfloat.h"
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -96,6 +96,8 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct list_elem sleep_elem;      /* List sleepers */
+    int nice;
+    MyFloat recent_cpu;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -154,6 +156,9 @@ void dump_ready_queue(void);
  */
 void try_preempt(void);
 void update_average_load(void);
+/* update every 1 second */
+void update_recent_cpu(struct thread* t);
+void update_priority(struct thread* t);
 /*-----update end--------*/
 
 #endif /* threads/thread.h */

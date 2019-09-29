@@ -12,7 +12,6 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "threads/myfloat.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -21,7 +20,7 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
-
+#define Precision 14
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 // static struct list ready_list;
@@ -144,7 +143,7 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
   /* initialize load_average*/
 
-  InitMyFloat(&load_average,0,14);
+  InitMyFloat(&load_average,0,Precision);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -181,6 +180,9 @@ thread_tick (int64_t ticks)
   else
     kernel_ticks++;
   
+  // increase recent cpu
+  MyAdd_Int(&t->recent_cpu,1);
+
   if(!list_empty(&block_queue)){
     // bool temp = false;
     //TODO set a threshold for the loop
@@ -441,10 +443,12 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
   /* Not yet implemented. */
-  
+  struct thread* th = thread_current();
+  th->nice = nice;
+  update_priority(th);
   try_preempt();
 }
 
@@ -453,7 +457,8 @@ int
 thread_get_nice (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  struct thread* th = thread_current();
+  return th->nice;
 }
 
 void update_average_load(){
@@ -462,14 +467,35 @@ void update_average_load(){
   if( thread_current() != idle_thread ){
     ready_threads++;
   }
-  
-  MyDivide_Int(MyMultiply_Add(MyMultiply_Int(&load_average, 59), ready_threads),60);
+  // printf("ready:%d\n",ready_threads);
+  MyDivide_Int(MyAdd_Int(MyMultiply_Int(&load_average, 59), ready_threads),60);
 }
+
+/* update priority */
+//recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice
+void update_recent_cpu(struct thread* t){
+  MyFloat denominator;
+  MyFloat numerator;
+  CopyMyFloat(&denominator, &load_average);
+  CopyMyFloat(&numerator, &load_average);
+  
+  MyDivide(MyMultiply_Int(&numerator, 2), MyAdd_Int(MyMultiply_Int(&denominator, 2), 1));
+  MyMultiply(&numerator, &t->recent_cpu);
+  MyMultiply_Int(&numerator, t->nice);
+}
+
+/* update mlqfs */
+//priority = PRI_MAX - (recent_cpu / 4) - (nice * 2)
+void update_priority(struct thread* t){
+  MyFloat temp;
+  CopyMyFloat(&temp, &t->recent_cpu);
+  t->priority = PRI_MAX - MyFloat2Int(MyDivide_Int(&temp, 4)) - t->nice*2;
+}
+
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  // printf("xxx:%d\n",MyFloat2Int_100(&load_average));
   return  MyFloat2Int_100(&load_average);
 }
 
@@ -478,7 +504,8 @@ int
 thread_get_recent_cpu (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  struct thread *th = thread_current();
+  return MyFloat2Int_100(&th->recent_cpu);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -568,6 +595,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->nice = 0;
+  InitMyFloat(&t->recent_cpu,0,Precision);
+
   sema_init(&t->wake_sig, 0);
   
   old_level = intr_disable ();
