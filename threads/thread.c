@@ -12,6 +12,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/myfloat.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -28,10 +29,7 @@
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
-
-static struct list block_queue; /* actually sleep queue */
-// static struct lock block_lock;
-
+static struct list ready_list;
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -63,6 +61,9 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+/* actually sleep queue */
+static struct list block_queue; 
+
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -75,20 +76,12 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-static bool insert_by_target(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
-  // struct thread *thread_a = list_entry(a, struct thread, sleep_elem);
-  // struct thread *thread_b = list_entry(b, struct thread, sleep_elem);
+/*------------update area---------------*/
+/* actually sleep queue */
+static struct list block_queue; 
+MyFloat load_average;
 
-  // if(thread_a->time_to_wake < thread_b->time_to_wake){
-  //   return true;
-  // }else if(thread_a->time_to_wake == thread_b->time_to_wake){
-  //   if(thread_a->priority > thread_b->priority){
-  //     return true;
-  //   }else{
-  //     return false;
-  //   }
-  // }
-  // return false;
+static bool insert_by_target(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
   return list_entry(a, struct thread, sleep_elem)->time_to_wake <= list_entry(b, struct thread, sleep_elem)->time_to_wake;
 };
 
@@ -96,9 +89,6 @@ static bool insert_by_target(const struct list_elem *a, const struct list_elem *
 insert by priority
 */
 bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
-  // struct thread *thread_a = list_entry(a, struct thread, elem);
-  // struct thread *thread_b = list_entry(b, struct thread, elem);
-
   return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 };
 
@@ -121,6 +111,8 @@ void try_preempt(){
     thread_yield();
   }
 }
+/*-----------update area end---------------*/
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -150,6 +142,9 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  /* initialize load_average*/
+
+  InitMyFloat(&load_average,0,14);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -449,7 +444,8 @@ void
 thread_set_nice (int nice UNUSED) 
 {
   /* Not yet implemented. */
-  // try_preempt();
+  
+  try_preempt();
 }
 
 /* Returns the current thread's nice value. */
@@ -460,12 +456,21 @@ thread_get_nice (void)
   return 0;
 }
 
+void update_average_load(){
+  int ready_threads = list_size(&ready_list);
+  /* Not yet implemented. */
+  if( thread_current() != idle_thread ){
+    ready_threads++;
+  }
+  
+  MyDivide_Int(MyMultiply_Add(MyMultiply_Int(&load_average, 59), ready_threads),60);
+}
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  // printf("xxx:%d\n",MyFloat2Int_100(&load_average));
+  return  MyFloat2Int_100(&load_average);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
