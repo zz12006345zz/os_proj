@@ -146,4 +146,9 @@ bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *a
 
 struct list ready_list;
 void dump_ready_queue(void);
+/* check the thread in the head of ready queue has higher priority over current running thread
+  1. yield if current context is a thread
+  2. yield on return if current context is an interrupt
+ */
+void try_preempt(void);
 #endif /* threads/thread.h */

@@ -102,25 +102,23 @@ bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *a
   return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 };
 
-static void try_preempt_sync(void){
-  ASSERT (!intr_context ());
-
+void try_preempt(){
+  /* only one thread othing to preempt */
   if(list_empty(&ready_list))
     return;
+
+  if(intr_context()) {
+    /* interrupt context */
   
+    if(running_thread()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
+      /* current thread has lower priority */
+      intr_yield_on_return();
+    }
+    return;
+  }
+  /* thread context */
   if(running_thread()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
     thread_yield();
-  }
-}
-
-static void try_preempt_async(void){
-  ASSERT (intr_context ());
-
-  if(list_empty(&ready_list))
-    return;
-  
-  if(running_thread()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
-    intr_yield_on_return();
   }
 }
 /* Initializes the threading system by transforming the code
@@ -189,7 +187,7 @@ thread_tick (int64_t ticks)
     kernel_ticks++;
   
   if(!list_empty(&block_queue)){
-    bool temp = false;
+    // bool temp = false;
     //TODO set a threshold for the loop
     struct list_elem *thread_elem;
     struct thread *th;
@@ -197,7 +195,7 @@ thread_tick (int64_t ticks)
       thread_elem = list_begin(&block_queue);
       th = list_entry(thread_elem, struct thread, sleep_elem);
       if(th->time_to_wake <= ticks){
-        temp = true;
+        // temp = true;
         list_remove(thread_elem);
         sema_up(&th->wake_sig);
         // thread_unblock(th);
@@ -206,9 +204,9 @@ thread_tick (int64_t ticks)
         break;
       }
     }
-    if(temp){
-      try_preempt_async();
-    }
+    // if(temp){
+    //   try_preempt();
+    // }
   }
   
   /* Enforce preemption. */
@@ -277,7 +275,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-  try_preempt_sync ();
+  try_preempt ();
   return tid;
 }
 
@@ -451,7 +449,7 @@ void
 thread_set_nice (int nice UNUSED) 
 {
   /* Not yet implemented. */
-  // try_preempt_sync();
+  // try_preempt();
 }
 
 /* Returns the current thread's nice value. */
