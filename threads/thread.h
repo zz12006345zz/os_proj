@@ -87,8 +87,6 @@ struct thread
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
-    int64_t time_to_wake;               /* At which time the thread should be waken ,meanless if thread is outside the block queue*/
-    struct semaphore wake_sig; /* sema down by itself, and up in timer interrupt */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
@@ -96,8 +94,16 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct list_elem sleep_elem;      /* List sleepers */
+    /*alarm clock*/
+    int64_t time_to_wake;               /* At which time the thread should be waken ,meanless if thread is outside the block queue*/
+    struct semaphore wake_sig; /* sema down by itself, and up in timer interrupt */
+    /*mlqfs*/
     int nice;
     MyFloat recent_cpu;
+    /*donation*/
+    // struct list donators; /*donation from the thread*/
+    // struct list_elem donate_elem;
+    int donated;      /* total amount the thread donated */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

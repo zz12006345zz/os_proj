@@ -22,6 +22,7 @@ struct lock
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
+    int donation; /* the amount the first thread donated to the holder */
   };
 
 void lock_init (struct lock *);
@@ -49,6 +50,7 @@ void cond_broadcast (struct condition *, struct lock *);
 #define barrier() asm volatile ("" : : : "memory")
 
 /* pintos project1 update area */
+bool donate_compare(const struct list_elem *a, const struct list_elem *b, void *aux);
 bool comp_priority_cond(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 #endif /* threads/synch.h */

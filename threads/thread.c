@@ -61,7 +61,8 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 bool thread_mlfqs;
 
 /* actually sleep queue */
-static struct list block_queue; 
+static struct list block_queue;
+static struct lock block_mutex; // TODO
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -131,7 +132,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  // lock_init (&block_lock);
+  lock_init (&block_mutex);
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&block_queue);
@@ -182,8 +183,8 @@ thread_tick (int64_t ticks)
   
   // increase recent cpu
   MyAdd_Int(&t->recent_cpu,1);
-
-  if(!list_empty(&block_queue)){
+  // if(list_empty(&block_queue)){
+  if(block_mutex.holder == NULL && !list_empty(&block_queue)){
     // bool temp = false;
     //TODO set a threshold for the loop
     struct list_elem *thread_elem;
@@ -280,12 +281,13 @@ void push_thread_to_blockQ(int64_t wakeup_time)
 {
   struct thread * th = thread_current();
   th->time_to_wake = wakeup_time;
-  // lock_acquire(&block_lock);
+  lock_acquire(&block_mutex);
   
   // printf("insert: prio%d\n",th->priority);
+
   list_insert_ordered(&block_queue, &th->sleep_elem, insert_by_target, NULL);
 
-  // lock_release(&block_lock);
+  lock_release(&block_mutex);
   sema_down(&th->wake_sig);
   // enum intr_level old_level = intr_disable ();
   // thread_block ();
@@ -596,6 +598,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   t->nice = 0;
+
+  // list_init(&t->donators);
+  t->donated = 0;
+
   InitMyFloat(&t->recent_cpu,0,Precision);
 
   sema_init(&t->wake_sig, 0);
