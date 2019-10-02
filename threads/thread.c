@@ -430,9 +430,14 @@ void
 thread_set_priority (int new_priority) 
 {
   struct thread* th = thread_current();
-  th->priority = new_priority;
-  if(th->status == THREAD_RUNNING && !list_empty(&ready_list) && list_entry(list_front(&ready_list), struct thread, elem)->priority > new_priority){
-    thread_yield();
+  if(list_empty(&th->donator_locks)){
+    th->priority = new_priority;
+    if(th->status == THREAD_RUNNING && !list_empty(&ready_list) && list_entry(list_front(&ready_list), struct thread, elem)->priority > new_priority){
+      thread_yield();
+    }
+  }else{
+    th->priority_delayed = true;
+    th->priority_aysnc = new_priority;
   }
 }
 
@@ -599,10 +604,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->nice = 0;
 
-  // list_init(&t->donators);
   t->donated = 0;
-
+  // t->owned_lock = 0;
+  t->priority_aysnc = 0;
+  t->priority_delayed = false;
+  // t->donator = NULL;
   InitMyFloat(&t->recent_cpu,0,Precision);
+  list_init(&t->donator_locks);
+  t->donee = NULL;
 
   sema_init(&t->wake_sig, 0);
   

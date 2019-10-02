@@ -102,8 +102,15 @@ struct thread
     MyFloat recent_cpu;
     /*donation*/
     // struct list donators; /*donation from the thread*/
-    // struct list_elem donate_elem;
+    /*actual priority = priority + donated*/
     int donated;      /* total amount the thread donated */
+    // int owned_lock;     /* the number of locks current thread holds , with a donation */
+    bool priority_delayed;
+    int priority_aysnc; /* set priority async */
+
+    // struct lock* donator;
+    struct list donator_locks;
+    struct lock* donee; // maybe we have multiple donee, but here we use one donee for convenience
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

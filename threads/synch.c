@@ -37,8 +37,11 @@
 bool donate_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
   return (list_entry(a, struct thread, elem)->priority + list_entry(a, struct thread, elem)->donated) 
             > (list_entry(b, struct thread, elem)->priority + list_entry(b, struct thread, elem)->donated);
-};
+}
 
+bool lock_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+  return list_entry(a, struct lock, lock_elem)->donation > list_entry(b, struct lock, lock_elem)->donation;
+}
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -195,6 +198,27 @@ lock_init (struct lock *lock)
   lock->donation = 0;
 }
 
+static int Donator_Forward(struct lock* lock, int donation){
+  if(!HOLDER->donee){
+    HOLDER->priority += donation;
+    lock->donation += donation;
+    return donation;
+  }
+  int extra_donate = HOLDER->priority + donation - HOLDER->donee->holder->priority;
+  if(extra_donate > 0){
+    Donator_Forward(HOLDER->donee, extra_donate);
+    lock->donation += donation - extra_donate;
+    HOLDER->priority += donation - extra_donate;
+  }else{
+    HOLDER->priority += donation;
+    lock->donation += donation;
+  }
+  return donation;
+}
+
+static int Donator_Backword(struct lock* lock, int return_doation){
+
+}
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
@@ -210,40 +234,92 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  struct thread* th = thread_current();
+  
   if(lock->holder == NULL){
     sema_down (&lock->semaphore);
     lock->holder = thread_current ();
     return;
   }
 
-    struct thread* th = thread_current();
-    if(list_empty(&lock->semaphore.waiters)){
-      if(th->priority > lock->holder->priority){
-        // printf("tid!!%d\n",lock->holder->tid); 
-        //donate
-        lock->donation = th->priority - lock->holder->priority;
-        th->donated = lock->donation;
-        lock->holder->priority += lock->donation;
-        th->priority -= lock->donation;
-      }
+  if(th->priority > HOLDER->priority){
+    if(list_empty(&HOLDER->donator_locks)){
+      // no other donator
+      th->donee = lock;
+      int donate = Donator_Forward(lock, th->priority - HOLDER->priority);
+      // lock->donation = th->priority - HOLDER->priority;
+      // HOLDER->priority = th->priority;
+      // HOLDER->owned_lock++;
+      list_push_back(&HOLDER->donator_locks, &lock->lock_elem);
+      // printf("sb2");
+      th->donated += donate;
+      th->priority -= donate;
     }else{
-      if(th->priority > lock->holder->priority){
-        //give back donate
+      // current donation is from other lock or from current lock
+      if(list_front(&HOLDER->donator_locks) == &lock->lock_elem){
+        // donation is from the current lock , the first elem in semaphore.waiters
+        // printf("sb2\n");
         struct thread *first_thread = list_entry(list_front(&lock->semaphore.waiters), struct thread, elem);
+        int donation = th->priority - first_thread->priority; // first_thread->priority + lock->donation = HOLDER->priority( after donation )
         first_thread->donated -= lock->donation;
         first_thread->priority += lock->donation;
-        HOLDER->priority -= lock->donation;
-        lock->donation = 0;
-        lock->donation = th->priority - HOLDER->priority;
-        HOLDER->priority += lock->donation;
+        first_thread->donee = NULL;
+        lock->donation = donation;
+
+        th->donee = lock;
+        HOLDER->priority = th->priority;
+        // check the holder should donate forward -- nested donate
+        th->donated += lock->donation;
+        th->priority -= lock->donation;
+        
+      }else{
+        // donation is from another lock, hold and donate
+        lock->donation = th->priority - HOLDER->priority + list_entry(list_front(&HOLDER->donator_locks), struct lock, lock_elem)->donation;
+        list_insert_ordered(&HOLDER->donator_locks, &lock->lock_elem, lock_compare, NULL);
+
+        HOLDER->priority = th->priority;
+        th->donee = lock;
+
         th->priority -= lock->donation;
         th->donated += lock->donation;
       }
     }
-    //donate before block
-    sema_down (&lock->semaphore);
-    lock->holder = thread_current ();
-  // }
+  }else{
+    // maybe we still needs donate
+    if(list_empty(&HOLDER->donator_locks)){
+      int to_donate = th->priority - HOLDER->priority + list_entry(list_front(&HOLDER->donator_locks), struct lock, lock_elem)->donation;
+      if(to_donate > 0){
+        if(lock->donation > 0){
+          // once donated, but not in the contribute to the donation right now
+          if(to_donate > lock->donation){
+            // i want to donate more!
+            // semaphore first elem -- do not donate
+            struct thread *first_thread = list_entry(list_front(&lock->semaphore.waiters), struct thread, elem);
+            first_thread->donated -= lock->donation;
+            first_thread->priority += lock->donation;
+            lock->donation = to_donate;
+            // insert again
+            list_remove(&lock->lock_elem);
+            list_insert_ordered(&th->donator_locks, &lock->lock_elem, lock_compare, NULL);
+            th->priority -= to_donate;
+            th->donee = lock;
+            th->donated += to_donate;
+          }
+        }else{
+          // not donated yet
+          lock->donation = to_donate;
+          list_insert_ordered(&th->donator_locks, &lock->lock_elem, lock_compare, NULL);
+          th->donated += lock->donation;
+          th->donee = lock;
+          th->priority -= lock->donation;
+        }
+      }
+    }
+  }
+
+  //donate before block
+  sema_down (&lock->semaphore);
+  lock->holder = thread_current ();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -278,14 +354,38 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   struct thread* th = thread_current();
-  int borrowed = 0;
   if(lock->donation != 0 && !list_empty(&lock->semaphore.waiters)){
     // time to return!
-    th->priority -= lock->donation;
-    list_entry(list_front(&lock->semaphore.waiters), struct thread, elem)->priority += lock->donation;
-    lock->donation = 0;
+    
+    struct thread *first_thread = list_entry(list_front(&lock->semaphore.waiters), struct thread, elem);
+    first_thread->donated -= lock->donation;
+    first_thread->priority += lock->donation;
+    first_thread->donee = NULL;
+
+    bool current_donator = false;
+    if(list_entry(&lock->lock_elem, struct lock, lock_elem) == list_entry(list_front(&th->donator_locks), struct lock, lock_elem)){
+      current_donator = true;
+    }
+    
+    printf("donation %d\n", lock->donation);
+    list_remove(&lock->lock_elem);
+    if(!list_empty(&th->donator_locks)) {
+      // printf("xxx1\n");      
+      // set current lock's donation to zero
+      if(current_donator){
+        HOLDER->priority -= (lock->donation - list_entry(list_front(&th->donator_locks), struct lock, lock_elem)->donation);
+      }
+      lock->donation = 0;
+    }else{
+      // no more donations, free the lock
+      HOLDER->priority -= lock->donation;
+      lock->donation = 0;
+      if(th->priority_delayed){
+        th->priority = th->priority_aysnc; 
+      }
+    }
   }
-  th->priority -= borrowed;
+/* Q: why we can't move this sentence upward? */
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
