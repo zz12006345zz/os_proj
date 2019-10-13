@@ -40,7 +40,7 @@ bool donate_compare(const struct list_elem *a, const struct list_elem *b, void *
 }
 
 bool lock_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
-  return list_entry(a, struct lock, lock_elem)->donation > list_entry(b, struct lock, lock_elem)->donation;
+  return list_entry(a, struct lock, lock_elem)->highest_priority > list_entry(b, struct lock, lock_elem)->highest_priority;
 }
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -125,6 +125,7 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) {
+    list_sort(&sema->waiters, priority_comp, NULL);
     struct thread *th = list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem);
     thread_unblock (th);
@@ -207,17 +208,31 @@ static int Donator_Forward(struct lock* lock, int donation){
   int extra_donate = HOLDER->priority + donation - HOLDER->donee->holder->priority;
   if(extra_donate > 0){
     Donator_Forward(HOLDER->donee, extra_donate);
-    lock->donation += donation - extra_donate;
+    lock->donation += donation;
     HOLDER->priority += donation - extra_donate;
   }else{
     HOLDER->priority += donation;
     lock->donation += donation;
   }
+
   return donation;
 }
 
-static int Donator_Backword(struct lock* lock, int return_doation){
-
+//lock->donation = right - left
+//delta lock->donation = (expected-current )
+static void Donator_Backword(struct thread* th, int expected, int delta_left){
+  if(list_empty(&th->donator_locks)){
+    // printf("return %s, %d\n",th->name, expected);
+    th->priority = expected;
+  }else{
+    struct lock* fisrt_lock = list_entry(list_front(&th->donator_locks), struct lock, lock_elem);
+    struct thread *first_thread = list_entry(list_front(&fisrt_lock->semaphore.waiters), struct thread, elem);
+    // printf("delta left %d,%d, return %d\n",delta_left - expected + th->priority,fisrt_lock->donation,delta_left);
+    Donator_Backword(first_thread, th->priority, delta_left - expected + th->priority);
+    fisrt_lock->donation += expected - th->priority - delta_left;
+    th->priority = expected;
+  }
+  // printf("priority %s %d\n", th->name, th->priority);
 }
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
@@ -246,7 +261,9 @@ lock_acquire (struct lock *lock)
     if(list_empty(&HOLDER->donator_locks)){
       // no other donator
       th->donee = lock;
+      lock->highest_priority = th->priority;
       int donate = Donator_Forward(lock, th->priority - HOLDER->priority);
+      // printf("donate %d\n",donate);
       // lock->donation = th->priority - HOLDER->priority;
       // HOLDER->priority = th->priority;
       // HOLDER->owned_lock++;
@@ -265,15 +282,16 @@ lock_acquire (struct lock *lock)
         first_thread->priority += lock->donation;
         first_thread->donee = NULL;
         lock->donation = donation;
+        lock->highest_priority = th->priority;
 
         th->donee = lock;
         HOLDER->priority = th->priority;
         // check the holder should donate forward -- nested donate
         th->donated += lock->donation;
         th->priority -= lock->donation;
-        
       }else{
         // donation is from another lock, hold and donate
+        lock->highest_priority = th->priority;
         lock->donation = th->priority - HOLDER->priority + list_entry(list_front(&HOLDER->donator_locks), struct lock, lock_elem)->donation;
         list_insert_ordered(&HOLDER->donator_locks, &lock->lock_elem, lock_compare, NULL);
 
@@ -356,38 +374,56 @@ lock_release (struct lock *lock)
   struct thread* th = thread_current();
   if(lock->donation != 0 && !list_empty(&lock->semaphore.waiters)){
     // time to return!
-    
     struct thread *first_thread = list_entry(list_front(&lock->semaphore.waiters), struct thread, elem);
-    first_thread->donated -= lock->donation;
-    first_thread->priority += lock->donation;
+    // first_thread->donated -= lock->donation;
     first_thread->donee = NULL;
-
+    // printf("first th prio:%d\n",first_thread->priority);
+    /* return donation */
     bool current_donator = false;
     if(list_entry(&lock->lock_elem, struct lock, lock_elem) == list_entry(list_front(&th->donator_locks), struct lock, lock_elem)){
       current_donator = true;
+      Donator_Backword(first_thread, th->priority, lock->donation);
+    }else{
+      Donator_Backword(first_thread, first_thread->priority + lock->donation, lock->donation);
     }
     
-    printf("donation %d\n", lock->donation);
     list_remove(&lock->lock_elem);
-    if(!list_empty(&th->donator_locks)) {
-      // printf("xxx1\n");      
+    // printf("return!3%s\n",thread_name());
+    if(!list_empty(&th->donator_locks)) {    
       // set current lock's donation to zero
       if(current_donator){
-        HOLDER->priority -= (lock->donation - list_entry(list_front(&th->donator_locks), struct lock, lock_elem)->donation);
+        // printf("11\n");
+        int temp = lock->donation - list_entry(list_front(&th->donator_locks), struct lock, lock_elem)->donation;
+        lock->donation = 0;
+        lock->holder = NULL;
+        sema_up (&lock->semaphore);
+        th->priority -= temp;
+      }else{
+        // printf("33\n");
+        lock->donation = 0;
+        lock->holder = NULL;
+        sema_up (&lock->semaphore);
       }
-      lock->donation = 0;
+      try_preempt();
     }else{
       // no more donations, free the lock
-      HOLDER->priority -= lock->donation;
+      // printf("22\n");
+      int temp = lock->donation;
       lock->donation = 0;
+      lock->holder = NULL;
+      sema_up (&lock->semaphore);
+      th->priority -= temp;
       if(th->priority_delayed){
         th->priority = th->priority_aysnc; 
+        th->priority_delayed = false;
       }
+      try_preempt();
     }
+  }else{
+    /* Q: why we can't move this sentence upward? */
+    lock->holder = NULL;
+    sema_up (&lock->semaphore);
   }
-/* Q: why we can't move this sentence upward? */
-  lock->holder = NULL;
-  sema_up (&lock->semaphore);
 }
 
 /* Returns true if the current thread holds LOCK, false

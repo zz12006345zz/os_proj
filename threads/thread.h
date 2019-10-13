@@ -109,8 +109,8 @@ struct thread
     int priority_aysnc; /* set priority async */
 
     // struct lock* donator;
-    struct list donator_locks;
-    struct lock* donee; // maybe we have multiple donee, but here we use one donee for convenience
+    struct list donator_locks; // donator locks
+    struct lock* donee; // maybe we have multiple donee, but here we use just one donee to pass test cases
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -172,6 +172,7 @@ void update_average_load(void);
 /* update every 1 second */
 void update_recent_cpu(struct thread* t);
 void update_priority(struct thread* t);
+
 /*-----update end--------*/
 
 #endif /* threads/thread.h */
