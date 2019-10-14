@@ -461,7 +461,7 @@ thread_set_nice (int nice)
   /* Not yet implemented. */
   struct thread* th = thread_current();
   th->nice = nice;
-  update_priority(th);
+  update_priority(th,NULL);
   try_preempt();
 }
 
@@ -486,6 +486,10 @@ void update_average_load(){
 
 void update_recent_cpu_all(){
   thread_foreach(update_recent_cpu,NULL);
+}
+
+void update_priority_all(){
+  thread_foreach(update_priority,NULL);
 }
 /* update priority */
 //recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice
@@ -516,9 +520,10 @@ void update_recent_cpu(struct thread* t, void* aux UNUSED){
 
 /* update mlqfs */
 //priority = PRI_MAX - (recent_cpu / 4) - (nice * 2)
-void update_priority(struct thread* t){
+void update_priority(struct thread* t, void* aux UNUSED){
   MyFloat temp;
   CopyMyFloat(&temp, &t->recent_cpu);
+  // printf("xxx\n");
   t->priority = PRI_MAX - MyFloat2Int(MyDivide_Int(&temp, 4)) - t->nice*2;
 }
 

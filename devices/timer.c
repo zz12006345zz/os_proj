@@ -182,6 +182,9 @@ timer_interrupt (struct intr_frame *args UNUSED)
     update_average_load();
     update_recent_cpu_all();
   }
+  if(thread_mlfqs && ticks % 4 == 0){
+    update_priority_all();
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
