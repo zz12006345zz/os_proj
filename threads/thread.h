@@ -170,9 +170,9 @@ void dump_ready_queue(void);
 void try_preempt(void);
 void update_average_load(void);
 /* update every 1 second */
-void update_recent_cpu(struct thread* t);
+void update_recent_cpu(struct thread* t, void* aux);
 void update_priority(struct thread* t);
-
+void update_recent_cpu_all(void);
 /*-----update end--------*/
 
 #endif /* threads/thread.h */

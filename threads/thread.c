@@ -173,17 +173,21 @@ thread_tick (int64_t ticks)
   struct thread *t = thread_current ();
 
   /* Update statistics. */
-  if (t == idle_thread)
+  if (t == idle_thread){
     idle_ticks++;
+  }
 #ifdef USERPROG
-  else if (t->pagedir != NULL)
+  else if (t->pagedir != NULL){
     user_ticks++;
+    MyAdd_Int(&t->recent_cpu,1);
+  } 
 #endif
-  else
+  else{
+    // increase recent cpu
     kernel_ticks++;
+    MyAdd_Int(&t->recent_cpu,1);
+  }
   
-  // increase recent cpu
-  MyAdd_Int(&t->recent_cpu,1);
   // if(list_empty(&block_queue)){
   if(block_mutex.holder == NULL && !list_empty(&block_queue)){
     // bool temp = false;
@@ -479,17 +483,34 @@ void update_average_load(){
   MyDivide_Int(MyAdd_Int(MyMultiply_Int(&load_average, 59), ready_threads),60);
 }
 
+void update_recent_cpu_all(){
+  thread_foreach(update_recent_cpu,NULL);
+}
 /* update priority */
 //recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice
-void update_recent_cpu(struct thread* t){
+void update_recent_cpu(struct thread* t, void* aux UNUSED){
+  // printf("xx %d,%d, %s\n",t->recent_cpu.precision,t->tid, t->name);
+  // printf("before %d\n",MyFloat2Int_100(&t->recent_cpu));
+  // printf("%d\n",MyFloat2Int_100(&t->recent_cpu));
   MyFloat denominator;
   MyFloat numerator;
   CopyMyFloat(&denominator, &load_average);
   CopyMyFloat(&numerator, &load_average);
-  
+  // printf("numerator %d,%d\n",MyFloat2Int_100(&numerator),MyFloat2Int_100(&load_average));
   MyDivide(MyMultiply_Int(&numerator, 2), MyAdd_Int(MyMultiply_Int(&denominator, 2), 1));
+  // printf("numerator2 %d\n",MyFloat2Int_100(&numerator));
   MyMultiply(&numerator, &t->recent_cpu);
-  MyMultiply_Int(&numerator, t->nice);
+  MyAdd_Int(&numerator, t->nice);
+  CopyMyFloat(&t->recent_cpu, &numerator);
+  // printf("after %d\n",MyFloat2Int_100(&t->recent_cpu));
+  // MyFloat aa;
+  // MyFloat bb;
+  
+  // InitMyFloat(&aa,2,14);
+  // InitMyFloat(&bb,3,14);
+  // printf("before %d\n",MyFloat2Int_100(&aa));
+  // MyMultiply(&aa,&bb);
+  // MyDivide(MyDivide(&aa,&bb),&bb);
 }
 
 /* update mlqfs */

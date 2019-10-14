@@ -178,8 +178,9 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick (ticks);
-  if(ticks % 100 == 0){
+  if(thread_mlfqs && ticks % 100 == 0){
     update_average_load();
+    update_recent_cpu_all();
   }
 }
 

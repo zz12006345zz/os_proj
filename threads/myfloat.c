@@ -1,9 +1,9 @@
 #include "myfloat.h"
-
+#include <stdio.h>
 void InitMyFloat(MyFloat* a, int integer, int precision){
     ASSERT(precision <= 31);
     ASSERT(precision >= 8);
-    a->val = integer;
+    a->val = (integer << precision);
     a->precision = precision;
 }
 void CopyMyFloat(MyFloat* a, const MyFloat *b){
@@ -23,12 +23,16 @@ MyFloat* MyAdd(MyFloat* a, MyFloat* b){
 
 MyFloat* MyMultiply(MyFloat* a, const MyFloat* b){
     ASSERT(a->precision == b->precision);
-    a->val = (int)(((int64_t)a->val * b->val) >> a->precision*2);
+    // printf("multiply %d,%d\n",MyFloat2Int_100(a),MyFloat2Int_100(b));
+    a->val = (int)(((int64_t)a->val * (int64_t)b->val) >> a->precision);
+    // printf("%d\n",MyFloat2Int_100(a));
     return a;
 }
 MyFloat* MyDivide(MyFloat* a, const MyFloat* b){
     ASSERT(a->precision == b->precision);
-    a->val = (int)(((int64_t)a->val << (a->precision*2))/b->val);
+    // printf("divide %d,%d\n",MyFloat2Int_100(a),MyFloat2Int_100(b));
+    a->val = (int)(((int64_t)a->val << (a->precision))/b->val);
+    // printf("%d\n",MyFloat2Int_100(a));
     return a;
 }
 MyFloat* MyMultiply_Int(MyFloat* a, int b){
@@ -52,9 +56,15 @@ MyFloat* MySub_Int(MyFloat* a, int b){
 }
 
 int MyFloat2Int(const MyFloat* a){
-    return (a->val >> a->precision);
+    if(a->val >= 0){
+        return (a->val + (1 << a->precision)/2) >> (a->precision);
+    }
+    return (a->val + (1 << a->precision)/2) >> (a->precision);
 }
 
 int MyFloat2Int_100(const MyFloat* a){
-    return (int64_t)a->val *100 >> (a->precision);
+    if(a->val >= 0){
+        return ((int64_t)a->val *100 + (1 << a->precision)/2) >> (a->precision);
+    }
+    return ((int64_t)a->val *100 - (1 << a->precision)/2) >> (a->precision);
 }
