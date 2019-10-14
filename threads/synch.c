@@ -305,33 +305,34 @@ lock_acquire (struct lock *lock)
   }else{
     // maybe we still needs donate
     if(list_empty(&HOLDER->donator_locks)){
-      int to_donate = th->priority - HOLDER->priority + list_entry(list_front(&HOLDER->donator_locks), struct lock, lock_elem)->donation;
-      if(to_donate > 0){
-        if(lock->donation > 0){
-          // once donated, but not in the contribute to the donation right now
-          if(to_donate > lock->donation){
-            // i want to donate more!
-            // semaphore first elem -- do not donate
-            struct thread *first_thread = list_entry(list_front(&lock->semaphore.waiters), struct thread, elem);
-            first_thread->donated -= lock->donation;
-            first_thread->priority += lock->donation;
-            lock->donation = to_donate;
-            // insert again
-            list_remove(&lock->lock_elem);
-            list_insert_ordered(&th->donator_locks, &lock->lock_elem, lock_compare, NULL);
-            th->priority -= to_donate;
-            th->donee = lock;
-            th->donated += to_donate;
-          }
-        }else{
-          // not donated yet
-          lock->donation = to_donate;
-          list_insert_ordered(&th->donator_locks, &lock->lock_elem, lock_compare, NULL);
-          th->donated += lock->donation;
-          th->donee = lock;
-          th->priority -= lock->donation;
-        }
-      }
+      // Not required by the test case
+      // int to_donate = th->priority - HOLDER->priority + list_entry(list_front(&HOLDER->donator_locks), struct lock, lock_elem)->donation;
+      // if(to_donate > 0){
+      //   if(lock->donation > 0){
+      //     // once donated, but not in the contribute to the donation right now
+      //     if(to_donate > lock->donation){
+      //       // i want to donate more!
+      //       // semaphore first elem -- do not donate
+      //       struct thread *first_thread = list_entry(list_front(&lock->semaphore.waiters), struct thread, elem);
+      //       first_thread->donated -= lock->donation;
+      //       first_thread->priority += lock->donation;
+      //       lock->donation = to_donate;
+      //       // insert again
+      //       list_remove(&lock->lock_elem);
+      //       list_insert_ordered(&th->donator_locks, &lock->lock_elem, lock_compare, NULL);
+      //       th->priority -= to_donate;
+      //       th->donee = lock;
+      //       th->donated += to_donate;
+      //     }
+      //   }else{
+      //     // not donated yet
+      //     lock->donation = to_donate;
+      //     list_insert_ordered(&th->donator_locks, &lock->lock_elem, lock_compare, NULL);
+      //     th->donated += lock->donation;
+      //     th->donee = lock;
+      //     th->priority -= lock->donation;
+      //   }
+      // }
     }
   }
 

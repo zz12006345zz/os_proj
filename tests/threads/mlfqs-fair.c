@@ -120,5 +120,6 @@ load_thread (void *ti_)
       if (cur_time != last_time)
         ti->tick_count++;
       last_time = cur_time;
+      // printf("%s,%d\n",thread_current()->name,thread_current()->priority);
     }
 }
