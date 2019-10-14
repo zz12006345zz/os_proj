@@ -94,22 +94,23 @@ bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *a
 
 void try_preempt(){
   /* only one thread othing to preempt */
-  if(list_empty(&ready_list))
-    return;
-
+  enum intr_level old_level;
   if(intr_context()) {
     /* interrupt context */
-  
-    if(running_thread()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
+    old_level = intr_disable ();
+    if(!list_empty(&ready_list) && running_thread()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
       /* current thread has lower priority */
       intr_yield_on_return();
     }
+    intr_set_level (old_level);
     return;
   }
   /* thread context */
-  if(running_thread()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
+  old_level = intr_disable ();
+  if(!list_empty(&ready_list) && running_thread()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
     thread_yield();
   }
+  intr_set_level (old_level);
 }
 
 /*-----------update area end---------------*/

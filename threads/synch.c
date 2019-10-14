@@ -132,9 +132,9 @@ sema_up (struct semaphore *sema)
   }
     
   sema->value++;
-  intr_set_level (old_level);
   /* when we wake up a new thread, check if the new thread has higher priority */
   try_preempt();
+  intr_set_level (old_level);
 }
 
 static void sema_test_helper (void *sema_);
