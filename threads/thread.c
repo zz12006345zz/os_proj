@@ -78,7 +78,7 @@ static tid_t allocate_tid (void);
 
 /*------------update area---------------*/
 /* actually sleep queue */
-static struct list block_queue; 
+// static struct list block_queue; 
 MyFloat load_average;
 
 static bool insert_by_target(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
@@ -490,6 +490,7 @@ void update_recent_cpu_all(){
 
 void update_priority_all(){
   thread_foreach(update_priority,NULL);
+  try_preempt();
 }
 /* update priority */
 //recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice

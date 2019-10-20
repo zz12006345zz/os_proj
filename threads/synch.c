@@ -268,14 +268,12 @@ lock_acquire (struct lock *lock)
       // HOLDER->priority = th->priority;
       // HOLDER->owned_lock++;
       list_push_back(&HOLDER->donator_locks, &lock->lock_elem);
-      // printf("sb2");
       th->donated += donate;
       th->priority -= donate;
     }else{
       // current donation is from other lock or from current lock
       if(list_front(&HOLDER->donator_locks) == &lock->lock_elem){
         // donation is from the current lock , the first elem in semaphore.waiters
-        // printf("sb2\n");
         struct thread *first_thread = list_entry(list_front(&lock->semaphore.waiters), struct thread, elem);
         int donation = th->priority - first_thread->priority; // first_thread->priority + lock->donation = HOLDER->priority( after donation )
         first_thread->donated -= lock->donation;
