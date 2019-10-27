@@ -15,7 +15,7 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
-#include "threads/thread.h"
+#include "threads/thread.h" 
 #include "threads/vaddr.h"
 
 static thread_func start_process NO_RETURN;
@@ -29,6 +29,8 @@ tid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
+  char *str_argvs; /* save tokenized args */
+  char *save_adr; /* save tokenized args's address */
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -37,6 +39,9 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+
+  str_argvs = strtok_r(file_name, &" ", &save_adr);
+  printf("here is the first reversion %s", *str_argvs)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -437,7 +442,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 12;
       else
         palloc_free_page (kpage);
     }
