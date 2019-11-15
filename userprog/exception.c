@@ -148,7 +148,7 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-  if (not_present){
+   if (not_present){
      _exit (-1);
   }
     
@@ -164,6 +164,14 @@ page_fault (struct intr_frame *f)
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
+
+//    if (not_present){
+//      _exit (-1);
+//   }
+    
+//   if(user){
+//      _exit (-1);
+//   }
   kill (f);
 }
 

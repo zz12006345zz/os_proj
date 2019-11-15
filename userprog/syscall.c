@@ -307,14 +307,24 @@ pid_t _exec (const char *file){
   struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
 
+  int i = 0;
+  while(file[i] != ' ' && file[i] != '\0'){
+    i++;
+  }
+
+  char *real_name = malloc(sizeof(char)* (i + 2));
+  strlcpy(real_name, file, i+1);
+  // printf("name :%s\n",real_name);
+
   if (dir != NULL)
-    dir_lookup (dir, file, &inode);
+    dir_lookup (dir, real_name, &inode);
+  dir_close (dir);
 
   if(inode == NULL){
-    // printf("file not exist!\n");
     return -1;
   }
   pid_t ret = process_execute(file);
+  free(real_name);
   return ret;
 }
 
