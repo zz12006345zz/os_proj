@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include <stdio.h>
+#include "userprog/syscall.h"
 
 void _initial_stack(char **save_ptr, void **esp);
 static thread_func start_process NO_RETURN;
@@ -40,7 +41,8 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE); // 4KB
-
+  // set an extra zero
+  fn_copy[strlen(file_name)+1] = '\0';
   char *temp;
   strtok_r(fn_copy, " ", &temp);
   /* Create a new thread to execute FILE_NAME. */
@@ -72,8 +74,10 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  if (!success) {
+    _exit(-1);
+  }
+    // thread_exit ();
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -106,12 +110,13 @@ process_wait (tid_t child_tid)
     return -1;
   }
   child->waited = true;
+  // printf("waiting! %s\n",child->name);
   sema_down(&child->process_wait);
   // while (!child->exit)
   //   {
   //     barrier();
   //   }
-  int status = child->exit_status;
+  int status = current->exit_status;
 
   return status;
 }

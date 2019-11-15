@@ -14,6 +14,7 @@
 #include "lib/kernel/hash.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "filesys/directory.h"
 #include "lib/kernel/hash.h"
 #include "threads/synch.h"
 #include "threads/malloc.h"
@@ -31,6 +32,7 @@ static bool _create (const char *file, unsigned initial_size);
 static int _open (const char *file);
 static void _close (int fd);
 static int _filesize (int fd);
+static pid_t _exec (const char *file);
 static struct hash file_descriptors;
 static int descriptor_CNT;
 static struct lock descriptor_lock;
@@ -88,7 +90,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
   case SYS_EXEC:
   {
-    /* code */
+    user_ptr_valid(stack_pointer + 1);
+    f->eax = _exec((char *)*(stack_pointer+1));
     break;
   }
   case SYS_WAIT:
@@ -171,7 +174,7 @@ void _halt(){
 
 void _exit(int status){
   struct thread* th = thread_current();
-  th->exit_status = status;
+  th->parent->exit_status = status;
   th->exit = true;
   list_remove(&th->child_elem);
   printf("%s: exit(%d)\n", th->name, status);
@@ -203,10 +206,6 @@ int32_t _write (int fd, const void *buffer, unsigned length){
   }
   struct file* f = hash_entry(file_node, my_entry, node)->file_descriptor;
   return file_write(f, buffer, length);
-}
-
-int32_t _wait(pid_t pid){
-  return process_wait(pid);
 }
 
 int32_t _read (int fd, void *buffer, unsigned length){
@@ -297,4 +296,30 @@ int _filesize (int fd){
   }
   return file_length(hash_entry(file_node, my_entry, node)->file_descriptor);
 }
+
+pid_t _exec (const char *file){
+  if(strcmp(file, "") == 0){
+    return -1;
+  }
+  // printf("exec: %s\n",file);
   
+  // printf("exec return %d\n",ret);
+  struct dir *dir = dir_open_root ();
+  struct inode *inode = NULL;
+
+  if (dir != NULL)
+    dir_lookup (dir, file, &inode);
+
+  if(inode == NULL){
+    // printf("file not exist!\n");
+    return -1;
+  }
+  pid_t ret = process_execute(file);
+  return ret;
+}
+
+int32_t _wait(pid_t pid){
+  int32_t ret = process_wait(pid);
+  // printf("wait ret: %d \n", ret);
+  return ret;
+}
