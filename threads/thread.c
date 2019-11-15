@@ -276,6 +276,10 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
+  /* project2 */
+  struct thread* parent = thread_current();
+  list_push_back(&parent->children_list, &t->child_elem);
+  t->parent = parent;
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -646,6 +650,14 @@ init_thread (struct thread *t, const char *name, int priority)
   
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem); // global variable protected by disable interrupt?
+  /* project2*/
+  list_init(&t->children_list);
+  t->parent = NULL;
+  sema_init(&t->process_wait,0);
+  t->exit_status = 0;
+  t->waited = false;
+  t->exit = false;
+  
   intr_set_level (old_level);
 }
 
@@ -765,6 +777,18 @@ allocate_tid (void)
     printf("%d ",list_entry(a,struct thread, elem)->priority);
   }
   printf("\n");
+}
+
+struct thread* find_child(struct thread* current, tid_t child_tid){
+  struct thread* child_th = NULL;
+  struct list_elem *c;
+  for(c = list_begin(&current->children_list); c != list_end(&current->children_list); c = list_next(c)){
+    child_th = list_entry(c, struct thread, child_elem);
+    if(child_th->tid == child_tid){
+      return child_th;
+    }
+  }
+  return NULL;
 }
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

@@ -17,9 +17,12 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+#include <stdio.h>
 
+void _initial_stack(char **save_ptr, void **esp);
 static thread_func start_process NO_RETURN;
-static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static bool load (const char *cmdline, void (**eip) (void), void **esp, char** save_ptr);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -36,10 +39,12 @@ process_execute (const char *file_name)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy, file_name, PGSIZE); // 4KB
 
+  char *temp;
+  strtok_r(fn_copy, " ", &temp);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (fn_copy, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -51,15 +56,19 @@ static void
 start_process (void *file_name_)
 {
   char *file_name = file_name_;
+  char *save_ptr = file_name;
   struct intr_frame if_;
   bool success;
-
+  while(*save_ptr != '\0'){
+    save_ptr++;
+  }
+  save_ptr++;
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (file_name, &if_.eip, &if_.esp, &save_ptr);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -86,9 +95,25 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;
+  struct thread* current = thread_current();
+  struct thread* child = find_child(current, child_tid);
+  if(child == NULL){
+    return -1;
+  }
+  if(child->waited){
+    return -1;
+  }
+  child->waited = true;
+  sema_down(&child->process_wait);
+  // while (!child->exit)
+  //   {
+  //     barrier();
+  //   }
+  int status = child->exit_status;
+
+  return status;
 }
 
 /* Free the current process's resources. */
@@ -195,7 +220,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, char** save_ptr, const char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -206,7 +231,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (const char *file_name, void (**eip) (void), void **esp, char** save_ptr) 
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -302,7 +327,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, save_ptr, file_name))
     goto done;
 
   /* Start address. */
@@ -424,23 +449,72 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+/* recursive push char* to stack */
+void _initial_stack(char **save_ptr, void **esp){
+  char *token = strtok_r (NULL, " ", save_ptr);
+  if(token == NULL){
+    return;
+  }
+  _initial_stack(save_ptr, esp);
+  size_t len = strlen(token);
+  *esp -= len + 1; 
+  strlcpy((char *)(*esp), token, len+1);
+}
+
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, char **save_ptr, const char* file_name) 
 {
   uint8_t *kpage;
   bool success = false;
-
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success){
         *esp = PHYS_BASE;
-      else
+        _initial_stack(save_ptr,esp);
+        *esp -= strlen(file_name) + 1;
+        strlcpy((char *)(*esp), file_name, strlen(file_name) + 1);
+        char *cmd_head = *esp;
+        if((uint32_t)(*esp) % 4 != 0){
+          // padding
+          uint32_t i = (uint32_t)(*esp) % 4;
+          *esp -= i;
+        }
+
+        char* search_pointer = PHYS_BASE-1;
+        int cnt = 1;
+        // dummy argv
+        *esp -= 4;
+        *(uint32_t *) *esp = 0;
+        //argv
+        while(search_pointer > cmd_head){
+          search_pointer--;
+          if(*search_pointer == '\0'){
+            *esp -= 4;
+            *(uint32_t *)(*esp) = (uint32_t)(search_pointer+1);
+            cnt++;
+          }
+        }
+        // argv[0]
+        *esp -= 4;
+        *(uint32_t *)(*esp) = (uint32_t)cmd_head;
+        // char** argv
+        *esp -= 4;
+        *(uint32_t *)(*esp) = (uint32_t)(*esp+4);
+        // argc
+        *esp -= 4;
+        *(int *)(*esp) = cnt;
+        // return address
+        *esp -= 4;
+        *(uint32_t *) *esp = 0;
+      }else{
         palloc_free_page (kpage);
+      }
     }
+  
   return success;
 }
 

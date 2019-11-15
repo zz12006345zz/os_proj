@@ -112,9 +112,22 @@ struct thread
     struct list donator_locks; // donator locks
     struct lock* donee; // maybe we have multiple donee, but here we use just one donee to pass test cases
 
+    /* parent process */
+    struct thread* parent;
+    struct list children_list;
+    /* variable in thread->children_list */
+    struct list_elem child_elem;
+    /* deal with duplicated process_wait() */
+    struct semaphore process_wait;
+    bool exit;//delete
+
+    bool waited;
+    int exit_status;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+
 #endif
 
     /* Owned by thread.c. */
@@ -174,6 +187,9 @@ void update_recent_cpu(struct thread* t, void* aux);
 void update_priority(struct thread* t, void* aux);
 void update_recent_cpu_all(void);
 void update_priority_all(void);
+/* project2 */
+struct thread* find_child(struct thread* current, tid_t child_tid);
+
 /*-----update end--------*/
 
 #endif /* threads/thread.h */
