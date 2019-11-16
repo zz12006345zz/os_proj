@@ -25,6 +25,7 @@ typedef int pid_t;
 static void syscall_handler (struct intr_frame *);
 static bool user_ptr_valid(const void *ptr);
 static void _halt(void) NO_RETURN;
+/* system call function declaration*/
 static int32_t _wait(pid_t pid);
 static int32_t _write (int fd, const void *buffer, unsigned length);
 static int32_t _read (int fd, void *buffer, unsigned length);
@@ -33,7 +34,12 @@ static int _open (const char *file);
 static void _close (int fd);
 static int _filesize (int fd);
 static pid_t _exec (const char *file);
+static void _seek (int fd, unsigned position);
+static unsigned _tell (int fd);
+static bool _remove (const char *file);
+
 static struct list_elem* search(struct thread*cur, int fd);
+
 // static struct hash file_descriptors;
 // static int descriptor_CNT;
 // static struct lock descriptor_lock;
@@ -116,7 +122,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
   case SYS_REMOVE:
   {
-    /* code */
+    user_ptr_valid(stack_pointer + 1);
+    f->eax = _remove((char *)*(stack_pointer+1));
     break;
   }
   case SYS_OPEN:
@@ -145,12 +152,14 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
   case SYS_SEEK:
   {
-    /* code */
+    user_ptr_valid(stack_pointer + 2);
+    _seek(*(int*)(stack_pointer + 1),*(unsigned *)(stack_pointer + 2));
     break;
   }
   case SYS_TELL:
   {
-    /* code */
+    user_ptr_valid(stack_pointer + 1);
+    f->eax = _tell(*(int*)(stack_pointer + 1));
     break;
   }
   case SYS_CLOSE:
@@ -192,12 +201,13 @@ void _exit(int status){
 }
 
 int32_t _write (int fd, const void *buffer, unsigned length){
+  // printf("write %zu\n", length);
   if(!user_ptr_valid(buffer)){
     _exit(-1);
   }
-  if(length > PGSIZE){
-    length = PGSIZE;
-  }
+  // if(length > PGSIZE){
+  //   length = PGSIZE;
+  // }
   
   if(fd == STDIN_FILENO){
     return -1;
@@ -312,6 +322,7 @@ void _close_all(struct thread* cur){
     file_close(file_entry->handle);
     free(file_entry);
   }
+
 }
 
 int _filesize (int fd){
@@ -370,4 +381,24 @@ struct list_elem* search(struct thread*cur, int fd){
     }
   }
   return NULL;
+}
+
+void _seek (int fd, unsigned position){
+  struct list_elem* file_entry = search(thread_current(), fd);
+  if(file_entry == NULL){// file not found
+    return;
+  }
+  file_seek(list_entry(file_entry, file_descritor, node)->handle, position);
+}
+
+unsigned _tell (int fd){
+  struct list_elem* file_entry = search(thread_current(), fd);
+  if(file_entry == NULL){// file not found
+    return 0;
+  }
+  return file_tell(list_entry(file_entry, file_descritor, node)->handle);
+}
+
+bool _remove (const char *file){
+  return filesys_remove(file);
 }
