@@ -46,7 +46,17 @@ process_execute (const char *file_name)
   char *temp;
   strtok_r(fn_copy, " ", &temp);
   /* Create a new thread to execute FILE_NAME. */
+  struct thread* cur = thread_current();
+  // assume child should not exit
+  cur->exit = false;
   tid = thread_create (fn_copy, PRI_DEFAULT, start_process, fn_copy);
+  // wait until we know whether child process has successfully started
+  sema_down(&cur->exec_sync);
+
+  // child process failed to start
+  if(cur->exit){
+    return -1;
+  }
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -74,8 +84,14 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+  struct thread* parent = thread_current()->parent;
   if (!success) {
+    parent->exit = true;
+    sema_up(&parent->exec_sync);
     _exit(-1);
+  }else{
+    parent->exit = false;
+    sema_up(&parent->exec_sync);
   }
     // thread_exit ();
 
@@ -104,19 +120,23 @@ process_wait (tid_t child_tid)
   struct thread* current = thread_current();
   struct thread* child = find_child(current, child_tid);
   if(child == NULL){
+    if(current->child == child_tid){
+      current->child = -1;
+      return current->exit_status;
+    }
     return -1;
   }
-  if(child->waited){
+  if(child->waited){// todo modify this
     return -1;
   }
   child->waited = true;
-  // printf("waiting! %s\n",child->name);
-  sema_down(&child->process_wait);
-  // while (!child->exit)
-  //   {
-  //     barrier();
-  //   }
+
+  if(!sema_try_down(&child->process_wait)){
+    sema_down(&child->process_wait);
+  }
+
   int status = current->exit_status;
+  // printf("status %d\n",status);
 
   return status;
 }
@@ -127,7 +147,8 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
+  
+  _close_all(cur);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;

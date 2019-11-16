@@ -33,36 +33,43 @@ static int _open (const char *file);
 static void _close (int fd);
 static int _filesize (int fd);
 static pid_t _exec (const char *file);
-static struct hash file_descriptors;
-static int descriptor_CNT;
-static struct lock descriptor_lock;
+static struct list_elem* search(struct thread*cur, int fd);
+// static struct hash file_descriptors;
+// static int descriptor_CNT;
+// static struct lock descriptor_lock;
 
-typedef struct _myhash {
-  int key;
-  struct hash_elem node;
-} myhash_helper;
+// typedef struct _myhash {
+//   int key;
+//   struct hash_elem node;
+// } myhash_helper;
 
-typedef struct _my_file_entry{
-  int key;
-  struct hash_elem node;
-  struct file * file_descriptor;
-}my_entry;
+// typedef struct _my_file_entry{
+//   int key;
+//   struct hash_elem node;
+//   tid_t tid;
+//   struct file * file_descriptor;
+// }my_entry;
 
-static unsigned my_hash (const struct hash_elem *e, void *aux UNUSED){
-  return hash_entry(e, myhash_helper, node)->key;
-} 
+// static unsigned my_hash (const struct hash_elem *e, void *aux UNUSED){
+//   return hash_entry(e, myhash_helper, node)->key;
+// } 
 
-static bool my_hash_comp (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED){
-  return hash_entry(a, myhash_helper, node)->key < hash_entry(b, myhash_helper, node)->key;
-}
+// static bool my_hash_comp (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED){
+//   return hash_entry(a, myhash_helper, node)->key < hash_entry(b, myhash_helper, node)->key;
+// }
+typedef struct _file_descritor{
+  int fd;
+  struct file* handle;
+  struct list_elem node;
+}file_descritor;
 
 void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  hash_init(&file_descriptors, my_hash, my_hash_comp, NULL);
-  descriptor_CNT = 2;
-  lock_init(&descriptor_lock);
+  // hash_init(&file_descriptors, my_hash, my_hash_comp, NULL);
+  // descriptor_CNT = 2;
+  // lock_init(&descriptor_lock);
 }
 
 static void
@@ -175,7 +182,8 @@ void _halt(){
 void _exit(int status){
   struct thread* th = thread_current();
   th->parent->exit_status = status;
-  th->exit = true;
+  th->parent->child = th->tid;
+  // th->exit = true;
   list_remove(&th->child_elem);
   printf("%s: exit(%d)\n", th->name, status);
   sema_up(&th->process_wait);
@@ -198,14 +206,15 @@ int32_t _write (int fd, const void *buffer, unsigned length){
     return length;
   }
 
-  myhash_helper helper;
-  helper.key = fd;
-  struct hash_elem* file_node = hash_find(&file_descriptors,&helper.node);
-  if(file_node == NULL){// file not found
+  // myhash_helper helper;
+  // helper.key = fd;
+  struct thread* cur = thread_current();
+  struct list_elem* file_entry = search(cur, fd);
+  if(file_entry == NULL){// file not found
     return -1;
   }
-  struct file* f = hash_entry(file_node, my_entry, node)->file_descriptor;
-  return file_write(f, buffer, length);
+
+  return file_write(list_entry(file_entry, file_descritor, node)->handle , buffer, length);
 }
 
 int32_t _read (int fd, void *buffer, unsigned length){
@@ -225,15 +234,15 @@ int32_t _read (int fd, void *buffer, unsigned length){
     return -1;
   }
 
-
-  myhash_helper helper;
-  helper.key = fd;
-  struct hash_elem* file_node = hash_find(&file_descriptors,&helper.node);
-  if(file_node == NULL){// file not found
+  // myhash_helper helper;
+  // helper.key = fd;
+  struct thread* cur = thread_current();
+  struct list_elem* file_entry = search(cur, fd);
+  if(file_entry == NULL){// file not found
     return -1;
   }
-  struct file* f = hash_entry(file_node, my_entry, node)->file_descriptor;
-  return file_read(f, buffer, length);
+
+  return file_read(list_entry(file_entry, file_descritor, node)->handle, buffer, length);
 }
 
 bool _create (const char *file, unsigned initial_size){
@@ -263,38 +272,58 @@ int _open (const char *file){
     return -1;
   }
   // printf("2\n");
-  my_entry *file_entry = malloc(sizeof(my_entry));
-  file_entry->file_descriptor = f_internal;
+  // printf("%d\n", sizeof(file_descritor));
+  file_descritor *file_entry = malloc(sizeof(file_descritor));
+  struct thread* cur = thread_current();
+  
+  file_entry->handle = f_internal;
+  file_entry->fd = cur->internal_fd++;
+  list_push_back(&cur->file_descriptors, &file_entry->node);
+  // file_entry->tid = thread_current()->tid;
+  // lock_acquire(&descriptor_lock);
+  // file_entry->key = descriptor_CNT++;
+  // hash_insert(&file_descriptors, &file_entry->node);
+  // lock_release(&descriptor_lock);
 
-  lock_acquire(&descriptor_lock);
-  file_entry->key = descriptor_CNT++;
-  hash_insert(&file_descriptors, &file_entry->node);
-  lock_release(&descriptor_lock);
-
-  return file_entry->key;
+  return file_entry->fd;
 }
 
 void _close (int fd){
   // printf("close %d\n",fd);
-  myhash_helper helper;
-  helper.key = fd;
-  struct hash_elem* file_entry = hash_delete(&file_descriptors,&helper.node);
+  // myhash_helper helper;
+  // helper.key = fd;
+  // struct hash_elem* file_entry = hash_delete(&file_descriptors,&helper.node);
+  struct thread* cur = thread_current();
+  struct list_elem* file_entry = search(cur, fd);
   if(file_entry){
-    // printf("delete!\n");
-    my_entry *f = hash_entry(file_entry, my_entry, node);
-    file_close(f->file_descriptor);
+    list_remove(file_entry);
+    file_descritor *f = list_entry(file_entry, file_descritor, node);
+    file_close(f->handle);
     free(f);
   }
 }
 
+void _close_all(struct thread* cur){
+  struct list_elem* it = list_begin(&cur->file_descriptors);
+  file_descritor* file_entry;
+  while(!list_empty(&cur->file_descriptors)){
+    file_entry = list_entry(it, file_descritor, node); 
+    it = list_remove(it);
+    file_close(file_entry->handle);
+    free(file_entry);
+  }
+}
+
 int _filesize (int fd){
-  myhash_helper helper;
-  helper.key = fd;
-  struct hash_elem* file_node = hash_find(&file_descriptors,&helper.node);
-  if(file_node == NULL){// file not found
+  // myhash_helper helper;
+  // helper.key = fd;
+  struct thread* cur = thread_current();
+  struct list_elem* file_entry = search(cur, fd);
+  if(file_entry == NULL){// file not found
     return -1;
   }
-  return file_length(hash_entry(file_node, my_entry, node)->file_descriptor);
+
+  return file_length(list_entry(file_entry, file_descritor, node)->handle);
 }
 
 pid_t _exec (const char *file){
@@ -304,27 +333,27 @@ pid_t _exec (const char *file){
   // printf("exec: %s\n",file);
   
   // printf("exec return %d\n",ret);
-  struct dir *dir = dir_open_root ();
-  struct inode *inode = NULL;
+  
 
-  int i = 0;
-  while(file[i] != ' ' && file[i] != '\0'){
-    i++;
-  }
+  // int i = 0;
+  // while(file[i] != ' ' && file[i] != '\0'){
+  //   i++;
+  // }
+  // struct dir *dir = dir_open_root ();
+  // struct inode *inode = NULL;
+  // char *real_name = malloc(sizeof(char)* (i + 2));
+  // strlcpy(real_name, file, i+1);
 
-  char *real_name = malloc(sizeof(char)* (i + 2));
-  strlcpy(real_name, file, i+1);
-  // printf("name :%s\n",real_name);
+  // if (dir != NULL)
+  //   dir_lookup (dir, real_name, &inode);
+  // dir_close (dir);
 
-  if (dir != NULL)
-    dir_lookup (dir, real_name, &inode);
-  dir_close (dir);
-
-  if(inode == NULL){
-    return -1;
-  }
+  // if(inode == NULL){
+  //   return -1;
+  // }
+  // printf("start %s\n", real_name);
   pid_t ret = process_execute(file);
-  free(real_name);
+  // free(real_name);
   return ret;
 }
 
@@ -332,4 +361,13 @@ int32_t _wait(pid_t pid){
   int32_t ret = process_wait(pid);
   // printf("wait ret: %d \n", ret);
   return ret;
+}
+
+struct list_elem* search(struct thread*cur, int fd){
+  for(struct list_elem* it = list_begin(&cur->file_descriptors); it!= list_end(&cur->file_descriptors); it = list_next(it)){
+    if(list_entry(it, file_descritor, node)->fd == fd){
+      return it;
+    }
+  }
+  return NULL;
 }

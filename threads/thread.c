@@ -75,7 +75,6 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-
 /*------------update area---------------*/
 /* actually sleep queue */
 // static struct list block_queue; 
@@ -280,6 +279,8 @@ thread_create (const char *name, int priority,
   struct thread* parent = thread_current();
   list_push_back(&parent->children_list, &t->child_elem);
   t->parent = parent;
+  // reset parent's status, let child process inform parent
+  parent->exit = false;
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -652,11 +653,16 @@ init_thread (struct thread *t, const char *name, int priority)
   list_push_back (&all_list, &t->allelem); // global variable protected by disable interrupt?
   /* project2*/
   list_init(&t->children_list);
+  list_init(&t->file_descriptors);
+  t->internal_fd = 2;
+  // hash_init(&t->file_descriptors, my_hash, my_hash_comp, NULL);
   t->parent = NULL;
   sema_init(&t->process_wait,0);
+  sema_init(&t->exec_sync,0);
   t->exit_status = 0;
   t->waited = false;
   t->exit = false;
+  t->child = -1;
   
   intr_set_level (old_level);
 }

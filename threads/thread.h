@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "threads/synch.h"
 #include "threads/myfloat.h"
+#include <hash.h>
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -113,16 +114,22 @@ struct thread
     struct lock* donee; // maybe we have multiple donee, but here we use just one donee to pass test cases
 
     /* parent process */
-    struct thread* parent;
-    struct list children_list;
+    struct thread* parent; /* a children only has one parent */
+    struct list children_list; /* parent may spawn multiple children */
     /* variable in thread->children_list */
     struct list_elem child_elem;
     /* deal with duplicated process_wait() */
-    struct semaphore process_wait;
-    bool exit;//delete
+    struct semaphore process_wait; // parent sema_down child. parent waits child's sema, child signals
+    struct semaphore exec_sync; // parent sema_down parent. parent waits it's own sema, child signals
+    struct list file_descriptors;
 
-    bool waited;
-    int exit_status;
+    bool exit; // in process_execute() the child process started successfully? pass from child -> parent. Useful in process execute sync.
+    bool waited;// maybe useless
+    tid_t child;// after child exit, pass the tid child -> parent
+    int exit_status;// after child exit pass the status. child -> parent
+    int internal_fd;
+
+    // struct hash file_descriptors; // use a list to store all it's fds. free them all when thread exit.
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -189,7 +196,6 @@ void update_recent_cpu_all(void);
 void update_priority_all(void);
 /* project2 */
 struct thread* find_child(struct thread* current, tid_t child_tid);
-
 /*-----update end--------*/
 
 #endif /* threads/thread.h */
