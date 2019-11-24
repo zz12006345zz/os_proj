@@ -127,6 +127,7 @@ process_wait (tid_t child_tid)
     return -1;
   }
   if(child->waited){// todo modify this
+
     return -1;
   }
   child->waited = true;
@@ -135,8 +136,8 @@ process_wait (tid_t child_tid)
     sema_down(&child->process_wait);
   }
 
-  int status = current->exit_status;
-  // printf("status %d\n",status);
+  int status = child->exit_status;
+  printf("status %d\n",status);
 
   return status;
 }
@@ -164,11 +165,12 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
-      _close_all(cur);
 //       if(cur->executing_file) {
 //       file_allow_write(cur->executing_file);
 //       file_close(cur->executing_file);
-// }
+// }   
+      _close_all(cur);
+
 
       cur->pagedir = NULL;
       pagedir_activate (NULL);
