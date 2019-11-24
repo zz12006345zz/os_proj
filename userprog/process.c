@@ -363,6 +363,9 @@ load (const char *file_name, void (**eip) (void), void **esp, char** save_ptr)
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
+  
+  file_deny_write (file);
+  thread_current()->executing_file = file;
 
   success = true;
 
