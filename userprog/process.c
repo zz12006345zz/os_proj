@@ -165,10 +165,10 @@ process_exit (void)
          directory, or our active page directory will be one
          that's been freed (and cleared). */
       _close_all(cur);
-      if(cur->executing_file) {
-      file_allow_write(cur->executing_file);
-      file_close(cur->executing_file);
-}
+//       if(cur->executing_file) {
+//       file_allow_write(cur->executing_file);
+//       file_close(cur->executing_file);
+// }
 
       cur->pagedir = NULL;
       pagedir_activate (NULL);
