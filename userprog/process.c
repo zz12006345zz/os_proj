@@ -149,13 +149,10 @@ process_exit (void)
   uint32_t *pd;
   
 // 
-  _close_all(cur);
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
-//   if(cur->executing_file) {
-//   file_allow_write(cur->executing_file);
-//   file_close(cur->executing_file);
-// }
+
 
   pd = cur->pagedir;
   if (pd != NULL) 
@@ -167,6 +164,12 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+      _close_all(cur);
+      if(cur->executing_file) {
+      file_allow_write(cur->executing_file);
+      file_close(cur->executing_file);
+}
+
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
