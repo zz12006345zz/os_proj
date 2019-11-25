@@ -370,7 +370,7 @@ pid_t _exec (const char *file){
 
 int32_t _wait(pid_t pid){
   int32_t ret = process_wait(pid);
-  // printf("wait ret: %d \n", ret);
+  printf("wait ret: %d \n", ret);
   return ret;
 }
 

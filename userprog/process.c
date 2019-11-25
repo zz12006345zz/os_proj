@@ -144,7 +144,7 @@ process_wait (tid_t child_tid)
   }
 
   int status = child->exit_status;
-  // printf("status %d\n",status);
+  printf("status %d\n",status);
 
   return status;
 }
