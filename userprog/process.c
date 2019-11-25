@@ -119,21 +119,21 @@ process_wait (tid_t child_tid)
 {
   struct thread* current = thread_current();
   struct thread* child = find_child(current, child_tid);
-  printf("status %d\n", current->exit_status);
+  // printf("status %d\n", current->exit_status);
   if(child == NULL){
     if(current->child == child_tid){
       current->child = -1;
-      printf("status's first %d", current->exit_status);
+      // printf("status's first %d", current->exit_status);
       return current->exit_status;
     }
-    printf("status null %d\n", current->exit_status);
+    // printf("status null %d\n", current->exit_status);
     return -1;
   }
   else{
     
   }
   if(child->waited){// todo modify this
-    printf("wait %d\n", child->exit_status);
+    // printf("wait %d\n", child->exit_status);
 
     return -1;
   }
@@ -144,7 +144,7 @@ process_wait (tid_t child_tid)
   }
 
   int status = child->exit_status;
-  printf("status %d\n",status);
+  // printf("status %d\n",status);
 
   return status;
 }
