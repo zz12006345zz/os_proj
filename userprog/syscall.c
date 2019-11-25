@@ -193,7 +193,7 @@ void _exit(int status){
   th->parent->exit_status = status;
   th->parent->child = th->tid;
   // th->exit = true;
-  list_remove(&th->child_elem);
+  // list_remove(&th->child_elem);
   printf("%s: exit(%d)\n", th->name, status);
   sema_up(&th->process_wait);
 
