@@ -125,6 +125,7 @@ process_wait (tid_t child_tid)
       printf("status's first %d", current->exit_status);
       return current->exit_status;
     }
+    printf("status null", current->exit_status);
     return -1;
   }
   else{
