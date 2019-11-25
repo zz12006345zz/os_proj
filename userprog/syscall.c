@@ -226,7 +226,7 @@ int32_t _write (int fd, const void *buffer, unsigned length){
   // struct list_elem* file_entry = search(cur, fd);
   // if(file_entry == NULL){// file not found
   //   return -1;
-  }
+  // }
 
   return file_write(list_entry(file_entry, file_descritor, node)->handle , buffer, length);
 }
