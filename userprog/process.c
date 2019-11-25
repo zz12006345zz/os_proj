@@ -126,6 +126,9 @@ process_wait (tid_t child_tid)
     }
     return -1;
   }
+  else{
+    
+  }
   if(child->waited){// todo modify this
 
     return -1;
@@ -136,7 +139,7 @@ process_wait (tid_t child_tid)
     sema_down(&child->process_wait);
   }
 
-  int status = current->exit_status;
+  int status = child->exit_status;
   // printf("status %d\n",status);
 
   return status;
