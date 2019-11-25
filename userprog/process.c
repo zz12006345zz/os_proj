@@ -119,6 +119,7 @@ process_wait (tid_t child_tid)
 {
   struct thread* current = thread_current();
   struct thread* child = find_child(current, child_tid);
+  printf("status %d\n", current->exit_status);
   if(child == NULL){
     if(current->child == child_tid){
       current->child = -1;
