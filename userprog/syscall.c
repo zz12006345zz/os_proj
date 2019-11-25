@@ -37,6 +37,8 @@ static pid_t _exec (const char *file);
 static void _seek (int fd, unsigned position);
 static unsigned _tell (int fd);
 static bool _remove (const char *file);
+int sys_read(int fd, void *buffer, unsigned size);
+int sys_write(int fd, const void *buffer, unsigned size);
 
 static struct list_elem* search(struct thread*cur, int fd);
 
@@ -201,27 +203,29 @@ void _exit(int status){
 }
 
 int32_t _write (int fd, const void *buffer, unsigned length){
-  // printf("write %zu\n", length);
-  if(!user_ptr_valid(buffer)){
-    _exit(-1);
-  }
-  // if(length > PGSIZE){
-  //   length = PGSIZE;
-  // }
-  
-  if(fd == STDIN_FILENO){
-    return -1;
-  }else if(fd == STDOUT_FILENO){
-    putbuf(buffer, length);
-    return length;
-  }
 
-  // myhash_helper helper;
-  // helper.key = fd;
-  struct thread* cur = thread_current();
-  struct list_elem* file_entry = search(cur, fd);
-  if(file_entry == NULL){// file not found
-    return -1;
+
+  // printf("write %zu\n", length);
+  // if(!user_ptr_valid(buffer)){
+  //   _exit(-1);
+  // }
+  // // if(length > PGSIZE){
+  // //   length = PGSIZE;
+  // // }
+  
+  // if(fd == STDIN_FILENO){
+  //   return -1;
+  // }else if(fd == STDOUT_FILENO){
+  //   putbuf(buffer, length);
+  //   return length;
+  // }
+
+  // // myhash_helper helper;
+  // // helper.key = fd;
+  // struct thread* cur = thread_current();
+  // struct list_elem* file_entry = search(cur, fd);
+  // if(file_entry == NULL){// file not found
+  //   return -1;
   }
 
   return file_write(list_entry(file_entry, file_descritor, node)->handle , buffer, length);
@@ -370,7 +374,7 @@ pid_t _exec (const char *file){
 
 int32_t _wait(pid_t pid){
   int32_t ret = process_wait(pid);
-  // printf("wait ret: %d \n", ret);
+  printf("wait ret: %d \n", ret);
   return ret;
 }
 
