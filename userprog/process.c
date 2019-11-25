@@ -129,9 +129,7 @@ process_wait (tid_t child_tid)
     // printf("status null %d\n", current->exit_status);
     return -1;
   }
-  else{
-    
-  }
+
   if(child->waited){// todo modify this
     // printf("wait %d\n", child->exit_status);
 
@@ -144,7 +142,7 @@ process_wait (tid_t child_tid)
   }
 
   int status = current->exit_status;
-  printf("status %d\n",status);
+  printf("status lala %d\n",status);
 
   return status;
 }
