@@ -136,8 +136,8 @@ process_wait (tid_t child_tid)
     sema_down(&child->process_wait);
   }
 
-  int status = child->exit_status;
-  printf("status %d\n",status);
+  int status = current->exit_status;
+  // printf("status %d\n",status);
 
   return status;
 }
