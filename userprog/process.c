@@ -122,6 +122,7 @@ process_wait (tid_t child_tid)
   if(child == NULL){
     if(current->child == child_tid){
       current->child = -1;
+      printf("status's first %d", status);
       return current->exit_status;
     }
     return -1;
@@ -140,7 +141,7 @@ process_wait (tid_t child_tid)
   }
 
   int status = child->exit_status;
-  // printf("status %d\n",status);
+  printf("status %d\n",status);
 
   return status;
 }
