@@ -131,6 +131,7 @@ process_wait (tid_t child_tid)
     
   }
   if(child->waited){// todo modify this
+    printf("wait %d\n", child->exit_status);
 
     return -1;
   }
