@@ -200,6 +200,7 @@ void _exit(int status){
   list_remove(&th->child_elem);
 
   printf("%s: exit(%d)\n", th->name, status);
+  file_close(th->prog_file);
   sema_up(&th->process_wait);
 
   thread_exit ();
