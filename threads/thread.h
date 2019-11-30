@@ -122,11 +122,12 @@ struct thread
     struct semaphore process_wait; // parent sema_down child. parent waits child's sema, child signals
     struct semaphore exec_sync; // parent sema_down parent. parent waits it's own sema, child signals
     struct list file_descriptors;
+    struct list exited_children;
 
     bool exit; // in process_execute() the child process started successfully? pass from child -> parent. Useful in process execute sync.
     bool waited;// maybe useless
-    tid_t child;// after child exit, pass the tid child -> parent
-    int exit_status;// after child exit pass the status. child -> parent
+    // tid_t child;// after child exit, pass the tid child -> parent
+    // int exit_status;// after child exit pass the status. child -> parent
     int internal_fd;
 
     // struct hash file_descriptors; // use a list to store all it's fds. free them all when thread exit.
@@ -140,6 +141,14 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+  /* use a list to store all the child process and its exit status */
+  struct exitS{
+    tid_t child;
+    int exit_status;
+    struct list_elem elem;
+  };
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -196,6 +205,7 @@ void update_recent_cpu_all(void);
 void update_priority_all(void);
 /* project2 */
 struct thread* find_child(struct thread* current, tid_t child_tid);
+struct exitS* find_exited(struct thread* current, tid_t child_tid);
 /*-----update end--------*/
 
 #endif /* threads/thread.h */

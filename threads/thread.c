@@ -654,15 +654,16 @@ init_thread (struct thread *t, const char *name, int priority)
   /* project2*/
   list_init(&t->children_list);
   list_init(&t->file_descriptors);
+  list_init(&t->exited_children);
   t->internal_fd = 2;
   // hash_init(&t->file_descriptors, my_hash, my_hash_comp, NULL);
   t->parent = NULL;
   sema_init(&t->process_wait,0);
   sema_init(&t->exec_sync,0);
-  t->exit_status = 0;
+  // t->exit_status = 0;
   t->waited = false;
   t->exit = false;
-  t->child = -1;
+  // t->child = -1;
   
   intr_set_level (old_level);
 }
@@ -792,6 +793,18 @@ struct thread* find_child(struct thread* current, tid_t child_tid){
     child_th = list_entry(c, struct thread, child_elem);
     if(child_th->tid == child_tid){
       return child_th;
+    }
+  }
+  return NULL;
+}
+
+struct exitS* find_exited(struct thread* current, tid_t child_tid){
+  struct exitS* e_entry = NULL; 
+  struct list_elem *c;
+  for(c = list_begin(&current->exited_children); c != list_end(&current->exited_children); c = list_next(c)){
+    e_entry = list_entry(c, struct exitS, elem);
+    if(e_entry->child == child_tid){
+      return e_entry;
     }
   }
   return NULL;

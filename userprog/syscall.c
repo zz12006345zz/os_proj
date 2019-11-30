@@ -190,10 +190,15 @@ void _halt(){
 
 void _exit(int status){
   struct thread* th = thread_current();
-  th->parent->exit_status = status;
-  th->parent->child = th->tid;
+  // th->parent->exit_status = status;
+  // th->parent->child = th->tid;
   // th->exit = true;
+  struct exitS* ex = malloc(sizeof(struct exitS));
+  ex->child = th->tid;
+  ex->exit_status = status;
+  list_push_back(&th->parent->exited_children, &ex->elem);
   list_remove(&th->child_elem);
+
   printf("%s: exit(%d)\n", th->name, status);
   sema_up(&th->process_wait);
 

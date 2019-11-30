@@ -120,11 +120,20 @@ process_wait (tid_t child_tid)
   struct thread* current = thread_current();
   struct thread* child = find_child(current, child_tid);
   if(child == NULL){
-    if(current->child == child_tid){
-      current->child = -1;
-      return current->exit_status;
+    // if(current->child == child_tid){
+    //   current->child = -1;
+    //   return current->exit_status;
+    // }
+    struct exitS* e_entry = NULL;
+    e_entry = find_exited(current, child_tid);
+    if(e_entry == NULL){
+      return -1;
     }
-    return -1;
+    
+    int exit_status = e_entry->exit_status;
+    list_remove(&e_entry->elem);
+    free(e_entry);
+    return exit_status;
   }
   if(child->waited){// todo modify this
     return -1;
@@ -135,10 +144,16 @@ process_wait (tid_t child_tid)
     sema_down(&child->process_wait);
   }
 
-  int status = current->exit_status;
-  // printf("status %d\n",status);
-
-  return status;
+  struct exitS* e_entry = NULL;
+  e_entry = find_exited(current, child_tid);
+  if(e_entry == NULL){
+    return -1;
+  }
+  
+  int exit_status = e_entry->exit_status;
+  list_remove(&e_entry->elem);
+  free(e_entry);
+  return exit_status;
 }
 
 /* Free the current process's resources. */
