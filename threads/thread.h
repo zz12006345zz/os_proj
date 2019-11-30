@@ -126,11 +126,8 @@ struct thread
 
     bool exit; // in process_execute() the child process started successfully? pass from child -> parent. Useful in process execute sync.
     bool waited;// maybe useless
-    // tid_t child;// after child exit, pass the tid child -> parent
-    // int exit_status;// after child exit pass the status. child -> parent
     int internal_fd;
     struct file* prog_file;
-    // struct hash file_descriptors; // use a list to store all it's fds. free them all when thread exit.
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

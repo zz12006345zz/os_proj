@@ -500,9 +500,6 @@ void update_priority_all(){
 /* update priority */
 //recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice
 void update_recent_cpu(struct thread* t, void* aux UNUSED){
-  // printf("xx %d,%d, %s\n",t->recent_cpu.precision,t->tid, t->name);
-  // printf("before %d\n",MyFloat2Int_100(&t->recent_cpu));
-  // printf("%d\n",MyFloat2Int_100(&t->recent_cpu));
   MyFloat denominator;
   MyFloat numerator;
   CopyMyFloat(&denominator, &load_average);
@@ -513,15 +510,6 @@ void update_recent_cpu(struct thread* t, void* aux UNUSED){
   MyMultiply(&numerator, &t->recent_cpu);
   MyAdd_Int(&numerator, t->nice);
   CopyMyFloat(&t->recent_cpu, &numerator);
-  // printf("after %d\n",MyFloat2Int_100(&t->recent_cpu));
-  // MyFloat aa;
-  // MyFloat bb;
-  
-  // InitMyFloat(&aa,2,14);
-  // InitMyFloat(&bb,3,14);
-  // printf("before %d\n",MyFloat2Int_100(&aa));
-  // MyMultiply(&aa,&bb);
-  // MyDivide(MyDivide(&aa,&bb),&bb);
 }
 
 /* update mlqfs */
@@ -656,14 +644,11 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&t->file_descriptors);
   list_init(&t->exited_children);
   t->internal_fd = 2;
-  // hash_init(&t->file_descriptors, my_hash, my_hash_comp, NULL);
   t->parent = NULL;
   sema_init(&t->process_wait,0);
   sema_init(&t->exec_sync,0);
-  // t->exit_status = 0;
   t->waited = false;
   t->exit = false;
-  // t->child = -1;
   
   intr_set_level (old_level);
 }
